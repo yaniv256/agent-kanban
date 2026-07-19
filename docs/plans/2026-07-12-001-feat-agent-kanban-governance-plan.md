@@ -23,13 +23,14 @@ execution: code
 
 ### Summary
 
-Agent Kanban keeps task state truthful while letting an agent execute continuously without taking priority authority away from the human. It requires full remediation before investigations close and deposits reusable learning before any completed card reaches Done.
+Agent Kanban keeps task state truthful while letting an agent execute continuously without taking priority authority away from the human. It requires full remediation before investigations close, deposits reusable learning before completed work leaves execution, and separates asynchronous review from runnable work and dependency blocking.
 
 ### Key Decisions
 
 - **Canonical identity:** The skill is named `agent-kanban`; prior Agent Task OS naming is migration vocabulary only.
 - **Human priority authority:** Backlog↔Next movement belongs to the human by default. Agent exceptions require a card note that names the governing invariant and evidence.
 - **Executable queue:** Next is ordered first by executor class and then by three-level priority.
+- **Review lifecycle:** Ready for Review holds completed packets awaiting a human review, approval, or decision without consuming the one-card In Progress slot. It is a first-class list, not an improvised label, because list membership is the durable lifecycle authority used by queue selection and cold resumption.
 - **Strict closure:** Investigation analysis and follow-up filing are not substitutes for implementing and verifying the complete remediation plan.
 
 ### Requirements
@@ -47,7 +48,9 @@ Agent Kanban keeps task state truthful while letting an agent execute continuous
 
 - R6. Agent-runnable cards precede every human-required card, with High → Normal → Low ordering inside each executor class.
 - R7. A human-required card cannot enter In Progress while any agent-runnable card remains in Next.
-- R8. When only human-required cards remain, the first enters In Progress, the agent asks for the required action or decision, and the goal pauses until the human responds.
+- R8. When only human-required execution cards remain, the first enters In Progress, the agent asks for the concrete non-review action, and the goal pauses until the human responds.
+- R8a. Completed work awaiting human review, approval, or a decision enters Ready for Review with the actual artifact, concise context, exact requested decision, validation evidence, risks, and residuals; it does not enter Next or Blocked.
+- R8b. Ready for Review may contain multiple cards while one Agent runnable card remains In Progress. Approval moves a complete card to Done; remaining work or requested changes returns it to Next as Agent runnable.
 
 **Blocked relationships**
 
@@ -55,7 +58,7 @@ Agent Kanban keeps task state truthful while letting an agent execute continuous
 - R10. An unblocker in Next declares whether the agent or human must execute it through its executor label.
 - R11. Blocked-to-Blocked links form an acyclic dependency graph; a card without an active linked blocker cannot remain Blocked, and the parent returns to Next when its final direct blocker reaches Done.
 - R11a. Reject cycle-forming edges. Repair an inherited cycle by removing its provably newest edge; if recency is unknowable, move participants to Backlog with lifecycle-exception notes and create a High-priority Human required Next card to establish the dependency order.
-- R11b. If Agent runnable work arrives during a pending human handoff, return the human card to its Next bucket and resume the topmost Agent runnable task.
+- R11b. If Agent runnable work arrives during a pending human execution handoff, return the human card to its Next bucket and resume the topmost Agent runnable task. Ready for Review cards remain available for asynchronous review and do not affect queue selection.
 
 **Closure and compounding**
 
@@ -77,8 +80,11 @@ flowchart TB
   IP --> V[Implement and verify]
   V --> C[Run CE Compound]
   C --> D{Closure evidence complete?}
-  D -->|yes| DN[Done]
-  D -->|dependency| B[Blocked with linked Next unblocker]
+  D -->|review required| RFR[Ready for Review: artifact + exact decision]
+  RFR -->|approved and complete| DN[Done]
+  RFR -->|remaining work or changes| NX
+  D -->|yes, no review| DN
+  D -->|dependency| B[Blocked with linked active blocker]
   D -->|incomplete| NX
 ```
 
@@ -88,6 +94,7 @@ flowchart TB
 - AE2. **Covers R9–R11.** Given A blocked by B and B blocked by C, the chain remains valid while its edges are acyclic. An attempted C → A edge is rejected with the cycle path; each parent returns to Next after its final direct blocker reaches Done.
 - AE3. **Covers R12–R13.** Given a completed investigation checklist whose remediation file still says a structural fix is deferred, the investigation cannot enter Done.
 - AE4. **Covers R14–R16.** Given verified ordinary work, Lightweight compounding runs before Done; a valid no-op proceeds, while a tool failure opens an investigation.
+- AE5. **Covers R8a–R8b.** Given a verified, compounded change with a complete public review packet, the card enters Ready for Review while the next Agent runnable card enters In Progress. Requested changes return the review card to Next and invalidate the old approval packet.
 
 ### Scope Boundaries
 
@@ -98,10 +105,11 @@ flowchart TB
 ### Dependencies / Assumptions
 
 - EveryInc/compound-engineering-plugin PR #662 provides the intended `mode:autofix depth:lightweight|standard|deep` capability.
-- The task substrate can create labels, link cards, read list membership, and verify mutations through an independent model read.
+- The task substrate can create labels, link cards, store a durable artifact link or attachment, read list membership, and verify mutations through an independent model read.
 
 ### Sources / Research
 
 - EveryInc/compound-engineering-plugin PR #662: non-interactive CE Compound depth selection.
 - `SKILL.md`: current Agent Kanban operating contract.
+- `docs/ready-for-review-migration.md`: Ready for Review setup, migration, and after-review transitions.
 - `tests/skill-contract.sh`: deterministic governance assertions.

@@ -66,7 +66,7 @@ This is "skills are context management" applied to task resumption.
 The system is a small set of rules. Follow them together — each one props up the others.
 
 ### 1. Trello is the offload / long-term task memory
-The board holds **everything** across lists: **Backlog, Next, Blocked, In Progress, Done**.
+The board holds **everything** across lists: **Backlog, Next, Blocked, In Progress, Ready for Review, Done**.
 Your own internal tracker stays **lean — only the in-process work.** Push completed,
 blocked, and backlog items **out** to Trello; keep the internal list small. The board is
 the durable memory; internal state is scratch.
@@ -102,8 +102,9 @@ If a task is finished:
    Standard/Full handles repeated, cross-component/repository, overlap-prone, or explicitly Full work; Deep
    handles security, privacy, data-loss, production incidents, or explicit Deep requests. The deepest applicable
    trigger wins.
-3. Move the card to **Done** only when completion and closure are verified.
-4. If proof is missing, keep it out of Done and record exactly what proof is missing.
+3. When completion and closure are verified but a human review, approval, or decision remains, move the
+   complete packet to **Ready for Review**. Otherwise move it to **Done**.
+4. If proof is missing, keep it out of Ready for Review and Done and record exactly what proof is missing.
 
 If a task is blocked:
 
@@ -150,6 +151,10 @@ required work sits after all Agent runnable work. Backlog↔Next transitions are
 prioritization decisions; an agent exception requires a verified lifecycle reason and an
 explanation note. Do not context-switch merely because a new task arrived.
 
+Completed human-review handoffs are not new work. They move to Ready for Review with the actual review
+artifact as a link or attachment, enough context to evaluate it, and the exact requested decision. Attachment
+is preferred when the substrate exposes a reviewed portable attachment action; a durable link is the fallback.
+
 ### 6. Operate through the agent (dogfooding)
 **All Trello writes** — add/move/label/checklist cards, create lists/boards — go
 **through the hosted browser agent via natural-language prompts. NEVER direct primitive
@@ -182,8 +187,9 @@ Every Next card has exactly one executor label (`Agent runnable` or `Human requi
 priority label (`Priority: High`, `Priority: Normal`, or `Priority: Low`). Keep all Agent runnable
 cards before Human required cards. Within each executor class, maintain High, Normal, and Low
 buckets; each new card enters at the top of its bucket. The next task is the topmost Agent runnable
-card. Only when no Agent runnable work remains may the top Human required card move to In Progress
-for a decision or action.
+card. Human-review handoffs do not belong here; a Human required Next card represents a concrete non-review
+action. Only when no Agent runnable work remains may the top Human required card move to In Progress for that
+action.
 
 If agent-runnable work appears while a Human required card is awaiting a response in In Progress,
 preserve the request, return the human card to the top of its Human/priority bucket, and resume the
@@ -191,6 +197,21 @@ topmost Agent runnable task. During every sync, traverse Blocked dependencies. R
 edges. For an inherited cycle, remove its provably newest edge; if history cannot establish recency,
 move the participants to Backlog with lifecycle-exception notes and create a High-priority Human required
 Next card to establish their order without guessing.
+
+### 10. Ready for Review is asynchronous human review
+
+Ready for Review means the agent's implementation, verification, compounding, and review packet are complete;
+only human review, approval, or a decision remains. Human-review handoffs belong in Ready for Review, not Next
+and not Blocked. The list can contain multiple cards while one true agent-runnable card remains In Progress, so
+reviews do not stall the execution queue.
+
+Each review card carries the review artifact, concise decision context, the exact requested decision, validation
+evidence, compatibility or migration risks, and known residuals. Approval moves the card to Done when it
+completes the task. Approval that unlocks remaining work, or requested changes, returns the card to Next as
+Agent runnable. A non-review dependency uses Blocked only after a concrete blocker is linked.
+
+Existing boards add Ready for Review between In Progress and Done and migrate completed review packets out of
+Next and Blocked using `docs/ready-for-review-migration.md`.
 
 ## Why This Matters
 

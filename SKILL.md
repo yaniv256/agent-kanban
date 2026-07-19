@@ -26,7 +26,7 @@ when you want the "why"; this SKILL.md is the operating checklist.
 ## Part A — The mechanics (how task state is held)
 
 ### 1. The store is your long-term task memory; keep your working set tight
-The store holds **everything** — Backlog, Next, Blocked, In Progress, Done. Your own in-process
+The store holds **everything** — Backlog, Next, Blocked, In Progress, Ready for Review, Done. Your own in-process
 tracker stays **lean**: only the live work. Push completed, blocked, and backlog items **out**
 to the store. The store is durable memory; internal state is scratch.
 
@@ -53,8 +53,11 @@ If the task is finished:
 
 1. Read the card's checklist/proof state from the store model.
 2. If implementation completion is verified, run the CE Compound closure gate in rule 4.7.
-3. Move the card to **Done** only when both implementation completion and CE Compound closure are verified.
-4. If either is not verified, leave it out of Done and record what proof is missing.
+3. If human review, approval, or a decision is still required, apply rule 4.8 and move the card to
+   **Ready for Review** with the review packet. Otherwise move it to **Done** only when both
+   implementation completion and CE Compound closure are verified.
+4. If implementation or compounding is not verified, leave the card out of Ready for Review and Done
+   and record what proof is missing.
 
 If the task is blocked:
 
@@ -108,6 +111,37 @@ task's tests, release gates, or live proof.
   outcome on the card and continue to Done.
 - **Failure:** A CE Compound execution failure is a bug and enters the investigation stack under rule 14. Do
   not mark the original work Done or silently convert the failure into a successful no-op.
+
+### 4.8. Ready for Review is a completed-work handoff, not an execution queue
+**Ready for Review** means the agent's implementation, verification, compounding, and review packet are
+complete; only human review, approval, or a decision remains. Human-review handoffs belong in Ready for
+Review, not Next and not Blocked.
+
+A review-ready card must contain:
+
+1. The actual review artifact as a link or attachment. An attachment is preferred when the substrate has a
+   reviewed portable attachment action; a durable link is the fallback.
+2. Enough concise context to evaluate the artifact without reconstructing the whole task.
+3. The exact requested decision, including the precise public action, merge, release, or design choice that
+   approval would authorize.
+4. Test and validation evidence, compatibility or migration risks, and known residuals.
+
+Ready for Review may contain multiple cards while exactly one true agent-runnable task remains In Progress.
+A pending review does not consume the single execution slot and does not stop autonomous queue walking.
+Blocked remains for non-review blockers and task dependencies. Next remains the ordered stack of runnable
+upcoming work.
+
+After the human response:
+
+- If approval completes the task and all closure evidence remains current, move the reviewed card to Done.
+- If approval unlocks remaining agent work, update the context and return the card to Next with `Agent runnable`
+  and its priority label; normal queue selection decides when it re-enters In Progress.
+- If the reviewer requests changes, capture them in the checklist, return the card to Next as Agent runnable,
+  and prepare a revised packet. Material changes to an externally visible packet require renewed approval.
+- If review uncovers a non-review dependency, move the card to Blocked only after linking the concrete blocker.
+
+Board creation and existing-board repair use `docs/ready-for-review-migration.md` as the setup and migration
+checklist.
 
 ### 5. Offload-for-focus and prioritization authority
 New tasks enter Next by default. Capture each incoming task there with the appropriate executor label
@@ -185,7 +219,8 @@ literal file, and add a regression note before continuing.
 A memory-less agent stalls: it asks the human a question, the human is away, and it idles instead
 of continuing. The fix is a **heartbeat**: a recurring timer (every ~10 min) that pulls you back
 to the board and makes you **sync + keep walking.** On each beat: read the board by model; enforce
-strict one-in-progress↔reality sync (finished → verify + compound → Done + pull the topmost Agent runnable card from Next;
+strict one-in-progress↔reality sync (finished → verify + compound → Ready for Review when a human decision remains,
+otherwise Done + pull the topmost Agent runnable card from Next;
 blocked/waiting → move the stale card to Blocked + pull the topmost Agent runnable card from Next); update the In
 Progress checklist; **then continue working the In Progress task — do the next checklist item, do
 not just report.** The heartbeat is what makes "always be walking" *automatic* rather than a thing
@@ -207,6 +242,12 @@ Noticing a violation and leaving it is itself the failure — a sync ENDS in a c
   *primary* job. Move every card that isn't what you're actually doing out (to Done if truly finished,
   Blocked if waiting on a linked task, Next if runnable but not active, or Backlog only when human-deferred with an explanation note) until exactly one remains — the one you then
   continue.
+- **Ready for Review — completed packets awaiting a human decision.** Every card here satisfies rule 4.8:
+  agent work, verification, and compounding are complete; the actual review artifact is linked or attached;
+  context and the exact requested decision are present. Ready for Review may hold multiple cards and never
+  consumes the one In Progress slot. A card with remaining agent implementation belongs in Next or In Progress;
+  a card waiting on a non-review task dependency belongs in Blocked. On approval, move the card to Done when
+  the reviewed artifact completes it, or return it to Next when agent work remains.
 - **Done — a card may enter Done ONLY if its checklist is fully complete (or it has none), its required
   implementation/remediation evidence is verified, and rule 4.7's CE Compound gate succeeded.** A card at
   `3/17` is not eligible for Done; neither is a 10/10 investigation with deferred remediation or a verified
@@ -227,9 +268,11 @@ Noticing a violation and leaving it is itself the failure — a sync ENDS in a c
     the waiting parent to the task that must finish first. Before adding a blocker link, traverse the dependency graph and reject any edge that would create a cycle. Record the exact cycle path on the affected cards; do not
     preserve or create a loop as durable state.
     On sync, repair inherited cycles rather than merely reporting them: record the exact cycle, then remove the newest edge in each pre-existing cycle when store history proves edge recency. Re-evaluate the former parent and move it to Next if no active blocker remains. If edge recency cannot be proven, do not invent an order: move every cycle participant to Backlog with the same lifecycle-exception note and create a `Human required`, `Priority: High` card in Next that links the participants and requests the dependency order. This clears the invalid loop while preserving every task.
-  - **"Waiting on the human" is NOT itself a valid block.** Represent the required human decision or action
-    as its own linked **Human required** card in Next. The parent may stay Blocked because that concrete card
-    now expresses the dependency; do not use an unactionable note such as "waiting on Yaniv" as the blocker.
+  - **"Waiting on the human" is NOT itself a valid block.** If completed agent work is awaiting review,
+    approval, or a decision, move its complete packet to Ready for Review under rule 4.8. If a human must
+    perform a non-review action that another task genuinely depends on, represent that action as a linked
+    **Human required** card in Next. The parent may stay Blocked because that concrete action card expresses
+    the dependency; do not use an unactionable note such as "waiting on Yaniv" as the blocker.
   - **"Unstarted" is not "blocked."** A card that simply hasn't begun and depends on nothing belongs in
     Next by default. Backlog is reserved for work the human has deferred.
   - So on a sync, for each Blocked card ask: *what linked task in Next, In Progress, or Blocked unblocks this?* If the answer is
@@ -238,7 +281,7 @@ Noticing a violation and leaving it is itself the failure — a sync ENDS in a c
     the three allowed lists preserves the dependency. When the final direct blocker reaches Done, move the parent
     to Next. Audit the full Blocked dependency graph for cycles on every sync.
 
-- **Next — label every card by executor and priority, then keep the queue executable.** Next is a stack partitioned into priority buckets. Every card in Next has
+- **Next — runnable upcoming work, labeled by executor and priority.** Next is a stack partitioned into priority buckets. Every card in Next has
   exactly one executor label from this pair: `Agent runnable` and `Human required`. Every card also has exactly
   one priority label: `Priority: High`, `Priority: Normal`, or `Priority: Low`. New tasks default to Priority: Normal.
   Labels are the category authority; prose such as "waiting on the user" or "urgent" does not substitute for them.
@@ -246,10 +289,12 @@ Noticing a violation and leaving it is itself the failure — a sync ENDS in a c
   - **Agent-first gate:** Never promote a Human required card while any Agent runnable card remains in Next.
     A heartbeat that sees an Agent runnable card in Next must move the topmost Agent runnable card to In Progress. It must execute that card instead of
     letting executable work sit idle.
-  - **Human handoff:** When no Agent runnable cards remain in Next, move the topmost Human required card to In Progress, ask the human for the required decision or action, and pause the goal until the human responds.
-    Do not mark the task Blocked merely because the answer is pending; In Progress truthfully names the active
-    handoff. After the response, complete that card or return it to Next with updated context, then resume the
-    queue.
+  - **Human execution handoff:** Human-review handoffs do not belong in Next; move completed review packets to
+    Ready for Review under rule 4.8. When no Agent runnable cards remain, a Human required card in Next must
+    therefore describe a concrete non-review human action. Move the topmost such card to In Progress, ask for
+    that action, and pause the goal until the human responds. Do not mark the task Blocked merely because the
+    action is pending; In Progress truthfully names the active handoff. After the response, complete that card
+    or return it to Next with updated context, then resume the queue.
     If Agent runnable work appears while a Human required card is In Progress awaiting a response, preserve the request and context, return the human card to the top of its Human/priority bucket in Next, move the topmost Agent runnable card to In Progress, and resume the goal. Reissue the human handoff when agent-runnable work is exhausted.
   - **"I'm blocked" is a HYPOTHESIS-SPACE ATTRACTOR — treat it with suspicion, not relief.** In a debugging
     investigation, "it's the platform's / another team's fault" is an *exculpatory attractor*: the hypothesis
@@ -336,7 +381,7 @@ resume work — don't just note the drift.
 hook** so it's automatic. Reference heartbeat prompt (adapt the store/task specifics):
 
 > HEARTBEAT (~10 min): route to the task store; read state by model; enforce one-in-progress↔reality
-> sync (finish→verify + compound→Done→pull the topmost Agent runnable Next card; blocked→Blocked + pull the topmost Agent runnable card from Next); update the checklist; then
+> sync (finish→verify + compound→Ready for Review when human review remains, otherwise Done→pull the topmost Agent runnable Next card; blocked→Blocked + pull the topmost Agent runnable card from Next); update the checklist; then
 > CONTINUE working the In Progress task (next checklist item, not just a report). Writes via the
 > agent; verify by model. Purpose: never stall — always be walking.
 

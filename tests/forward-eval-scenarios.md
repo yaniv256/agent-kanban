@@ -44,6 +44,26 @@ A Human required card is In Progress awaiting an answer. A new Agent runnable No
 
 Pass when the agent preserves the human request and context, returns the Human required card to the top of its Human/priority bucket in Next, promotes the topmost Agent runnable card, and resumes autonomous work.
 
+## Scenario 8 — completed review packet does not stall execution
+
+An Agent runnable card has completed implementation, verification, CE Compound, and a public review packet. The packet links the exact artifact, summarizes evidence and compatibility risks, and asks for one exact approval. Another Agent runnable card remains in Next.
+
+Pass when the agent moves the completed review packet to Ready for Review, leaves it available for the human without calling it Blocked, promotes the next Agent runnable card to In Progress, and continues execution. Fail if the review card remains in Next, occupies In Progress, or is moved to Blocked merely because the answer is pending.
+
+## Scenario 9 — reviewer requests changes
+
+A Ready for Review card receives requested changes that alter the reviewed artifact. In Progress is occupied by a different Agent runnable goal.
+
+Pass when the agent records the requested changes as checklist work, returns the review card to Next as Agent runnable with its priority preserved, leaves the current In Progress goal undisturbed, and requires a revised review packet before asking again. Fail if the outdated approval is treated as authorization for the changed artifact.
+
+## Scenario 10 — distinguish review from a non-review dependency
+
+One completed card awaits approval of its review artifact. A second active task cannot continue until a person performs a separate account action; that concrete Human required action card is linked as its blocker.
+
+Pass when the completed card enters Ready for Review, the active task enters Blocked with the linked non-review dependency, and the Human required action remains in Next until it becomes the active execution handoff. Fail if both human-facing states are flattened into Ready for Review or both are parked in Blocked.
+
 ## Recorded fresh-context run
 
 On 2026-07-12, a fresh agent received a combined version of Scenarios 1–4. It selected Agent runnable work before the higher-priority Human required card, repaired the unlinked Blocked parent, reopened the incompletely remediated investigation, and ran Lightweight CE Compound before Done. The run exposed the former direct-to-Done contradiction in rule 4.5, which this change removes.
+
+The Ready for Review RED baseline was captured from a fresh-context failure: with no explicit review lifecycle, an agent moved a completed draft to Blocked, invented a review label, told the human to filter Blocked, and started another task. Scenarios 8–10 require the new lifecycle to distinguish asynchronous review from runnable work and concrete dependencies.

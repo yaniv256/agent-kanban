@@ -26,9 +26,15 @@ Active standalone skill, imported as a submodule by actions.json.dev. Companion 
 
 - Exactly one card is In Progress.
 - New work enters Next with one executor label and one three-level priority label. Next is a priority-bucketed stack: new work enters at the top of its High, Normal, or Low bucket, and the top Agent runnable card is selected next.
+- Ready for Review holds completed agent work whose review artifact, evidence, context, and exact requested decision are ready for a human. It may hold multiple cards without consuming the single In Progress slot.
+- Human-review handoffs use Ready for Review. Next remains runnable upcoming work; Blocked remains for concrete non-review task dependencies.
 - Blocked cards form an acyclic dependency graph over Next, In Progress, and Blocked, then return to Next when their final direct blocker reaches Done.
 - Investigations close only after full remediation and verification.
 - Verified work runs CE Compound before entering Done.
+
+Board setup and migration guidance: [`docs/ready-for-review-migration.md`](docs/ready-for-review-migration.md).
+Review artifacts should be attached when a reviewed portable attachment action exists; a durable link is the
+fallback. Every handoff must state the exact requested decision.
 
 ## Migration from `agent-task-os`
 
